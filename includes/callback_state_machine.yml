@@ -1,0 +1,45 @@
+name: CallbackStepFunction
+useExactVersion: true #for blue green deployment
+definition:
+  Comment: Demonstrate how to use callbacks by sending Token
+  StartAt: Publish SQS message
+  States:
+    Publish SQS message:
+      Type: Task
+      Resource: arn:aws:states:::sqs:sendMessage.waitForTaskToken
+      Parameters:
+        QueueUrl:
+          Ref: MyQueue
+        MessageBody:
+          input.$: "$"
+          StateMachineId.$: $$.StateMachine.Id
+          ExecutionId.$: $$.Execution.Id
+          StateName.$: $$.State.Name
+          Token.$: $$.Task.Token
+      Next: Invoke Lambda
+    Invoke Lambda:
+      Type: Task
+      Resource: arn:aws:states:::lambda:invoke.waitForTaskToken
+      Parameters:
+        FunctionName:
+          Ref: callback_lambda
+        Payload:
+          input.$: "$"
+          StateMachineId.$: $$.StateMachine.Id
+          ExecutionId.$: $$.Execution.Id
+          StateName.$: $$.State.Name
+          Token.$: $$.Task.Token
+      Next: Publish SNS message
+    Publish SNS message:
+      Type: Task
+      Resource: arn:aws:states:::sns:publish.waitForTaskToken
+      Parameters:
+        TopicArn:
+          Ref: MyTopic
+        Message:
+          input.$: "$"
+          StateMachineId.$: $$.StateMachine.Id
+          ExecutionId.$: $$.Execution.Id
+          StateName.$: $$.State.Name
+          Token.$: $$.Task.Token
+      End: true

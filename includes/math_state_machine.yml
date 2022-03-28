@@ -1,0 +1,65 @@
+name: MathStepFunction
+useExactVersion: true #for blue green deployment
+events:
+  - http:
+      path: gatewayPath
+      method: POST
+definition:
+  Comment: "Mathematics"
+  StartAt: MappedState
+  States:
+    MappedState:
+      Type: Map
+      End: true
+      Iterator:
+        StartAt: Parallel
+        States:
+          Parallel:
+            Type: Parallel
+            End: true
+            Branches:
+            - StartAt: Add
+              States:
+                Add:
+                  Type: Task
+                  Resource:
+                    Fn::GetAtt: [add, Arn]
+                  Next: IsBigNumber
+                IsBigNumber:
+                  Type: Choice
+                  Choices:
+                    - Variable: $
+                      NumericGreaterThan: 50
+                      Next: DoubleBigNumber
+                  Default: Double
+                Double:
+                  Type: Task
+                  Resource:
+                    Fn::GetAtt: [double, Arn]
+                  Next: PassedState
+                  Retry:
+                    - ErrorEquals: [NumberisTooBigError]
+                      MaxAttempts: 0
+                    - ErrorEquals: [States.ALL]
+                      MaxAttempts: 3
+                  Catch:
+                    - ErrorEquals: [States.ALL]
+                      Next: FailedState
+                DoubleBigNumber:
+                  Type: Task
+                  Resource:
+                    Fn::GetAtt: [doubleBigNumber, Arn]
+                  End: true
+                FailedState: 
+                  Type: Fail  
+                PassedState: 
+                  Type: Pass
+                  End: true    
+            - StartAt: Subtract
+              States:
+                Subtract:
+                  Type: Task
+                  Resource:
+                    Fn::GetAtt: [subtract, Arn]
+                  ResultPath: "$.taskresult"
+                  End: true 

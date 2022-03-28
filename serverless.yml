@@ -1,0 +1,85 @@
+
+
+service: step-functions-intro
+frameworkVersion: '3'
+
+provider:
+  name: aws
+  runtime: nodejs12.x
+  iam:
+    role:
+      statements:
+        - Effect: "Allow"
+          Action:
+            - states:StartExecution
+            - states:SendTaskSuccess
+            - states:SendTaskFailure
+          Resource: 
+            - arn:aws:states:${aws:region}:${aws:accountId}:stateMachine:MathStepFunction
+            - arn:aws:states:${aws:region}:${aws:accountId}:stateMachine:CallbackStepFunction
+
+functions:
+  add:
+    handler: src/handler.add
+  subtract:
+    handler: src/handler.subtract
+  double:
+    handler: src/handler.double
+  doubleBigNumber:
+    handler: src/handler.doubleBigNumber
+  triggerStateMachine:
+    handler: src/handler.triggerhandler
+    environment:
+      statemachine_arn: ${self:resources.Outputs.MathStepFunction.Value}
+    events: # The Events that trigger this Function
+      - httpApi: 'POST /'
+
+  sqs:
+    handler: src/callback_handler.sqs
+    events:
+      - sqs:
+          arn:
+            Fn::GetAtt: [MyQueue, Arn]
+          batchSize: 1
+  callback_lambda:
+    handler: src/callback_handler.callback_lambda
+  sns:
+    handler: src/callback_handler.sns
+    events:
+      - sns:
+          arn:
+            Ref: MyTopic
+          topicName: callback-topic
+
+	
+resources:
+  Outputs:
+    MathStepFunction:
+      Description: The ARN of the example state machine
+      Value:
+        Ref: MathStepFunction
+  
+  Resources:
+    MyQueue:
+      Type: AWS::SQS::Queue
+
+    MyTopic:
+      Type: AWS::SNS::Topic
+      Properties:
+        DisplayName: callback-topic
+        TopicName: callback-topic
+  
+  
+
+plugins:
+  - serverless-step-functions
+  # - serverless-pseudo-parameters
+
+	
+stepFunctions:
+  stateMachines:
+    MathStepFunction:
+      ${file(includes/math_state_machine.yml)}
+    CallbackStepFunction:
+      ${file(includes/callback_state_machine.yml)}
+  
